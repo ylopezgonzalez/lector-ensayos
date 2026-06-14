@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lector de Ensayos · Corrección automática</title>
+<style>
+  :root{
+    --ink:#16201a; --paper:#f6f4ee; --line:#d8d3c6;
+    --green:#1f6b46; --green-soft:#e4efe7; --amber:#b5780f;
+    --red:#a3361f; --muted:#6f6a5d;
+    --shadow:0 1px 0 #fff inset, 0 2px 8px rgba(20,30,20,.06);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family:"Inter","Helvetica Neue",Arial,sans-serif;
+    color:var(--ink); background:var(--paper);
+    line-height:1.5; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:860px; margin:0 auto; padding:32px 20px 80px}
+  header.top{border-bottom:2px solid var(--ink); padding-bottom:16px; margin-bottom:8px}
+  header.top h1{
+    font-size:26px; margin:0; letter-spacing:-.01em; font-weight:800;
+  }
+  header.top p{margin:4px 0 0; color:var(--muted); font-size:14px}
+  .step{
+    border:1px solid var(--line); background:#fff; border-radius:10px;
+    margin-top:22px; box-shadow:var(--shadow); overflow:hidden;
+  }
+  .step-head{
+    display:flex; align-items:center; gap:12px; padding:16px 20px;
+    border-bottom:1px solid var(--line); background:#fbfaf6;
+  }
+  .step-num{
+    flex:0 0 auto; width:28px; height:28px; border-radius:50%;
+    background:var(--ink); color:#fff; display:grid; place-items:center;
+    font-size:14px; font-weight:700;
+  }
+  .step-head h2{font-size:16px; margin:0; font-weight:700}
+  .step-head .hint{margin-left:auto; font-size:13px; color:var(--muted)}
+  .step-body{padding:20px}
+  label.field{display:block; font-size:13px; font-weight:600; margin-bottom:6px}
+  input[type=file], textarea, input[type=text]{
+    width:100%; font:inherit; padding:10px 12px; border:1px solid var(--line);
+    border-radius:8px; background:var(--paper);
+  }
+  textarea{resize:vertical; min-height:120px; font-family:ui-monospace,Menlo,monospace; font-size:13px}
+  .help{font-size:12.5px; color:var(--muted); margin-top:6px}
+  .btn{
+    font:inherit; font-weight:700; border:none; border-radius:8px; cursor:pointer;
+    padding:12px 22px; background:var(--green); color:#fff;
+  }
+  .btn:disabled{opacity:.5; cursor:not-allowed}
+  .btn.secondary{background:#fff; color:var(--ink); border:1px solid var(--line)}
+  .actions{margin-top:26px; display:flex; gap:12px; align-items:center}
+  table.pauta{width:100%; border-collapse:collapse; font-size:13px}
+  table.pauta th, table.pauta td{border:1px solid var(--line); padding:5px 7px; text-align:left}
+  table.pauta th{background:#fbfaf6; font-weight:600}
+  table.pauta input{width:100%; border:none; background:transparent; font:inherit; padding:3px}
+  table.pauta td.num{background:#fbfaf6; text-align:center; font-weight:600; width:44px}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr}}
+  #resultados{margin-top:10px}
+  .res-row{
+    display:flex; align-items:center; gap:10px; padding:8px 12px;
+    border:1px solid var(--line); border-radius:8px; margin-bottom:6px; font-size:13.5px;
+    background:#fff;
+  }
+  .pill{font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px}
+  .pill.ok{background:var(--green-soft); color:var(--green)}
+  .pill.warn{background:#f6ecd5; color:var(--amber)}
+  .pill.err{background:#f4ddd6; color:var(--red)}
+  .note{font-size:13px; padding:12px 14px; border-radius:8px; margin-top:14px}
+  .note.info{background:var(--green-soft); color:var(--green)}
+  .note.error{background:#f4ddd6; color:var(--red)}
+  .spin{display:inline-block; width:15px; height:15px; border:2px solid #fff;
+    border-top-color:transparent; border-radius:50%; animation:s .7s linear infinite; vertical-align:-2px}
+  @keyframes s{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Lector de Ensayos</h1>
+    <p>Corrige hojas de respuesta desde fotos y las vuelca en tu planilla de análisis.</p>
+  </header>
+
+  <!-- PASO 1 -->
+  <section class="step">
+    <div class="step-head"><span class="step-num">1</span>
+      <h2>Lista de estudiantes</h2>
+      <span class="hint">en orden de N° de lista</span></div>
+    <div class="step-body">
+      <label class="field" for="lista">Un nombre por línea (línea 1 = N° 1, línea 2 = N° 2…)</label>
+      <textarea id="lista" placeholder="Lucas Aguilera&#10;Elías Arancibia&#10;Lester Aros&#10;…"></textarea>
+      <p class="help">El orden define el número de lista de cada estudiante.</p>
+    </div>
+  </section>
+
+  <!-- PASO 2 -->
+  <section class="step">
+    <div class="step-head"><span class="step-num">2</span>
+      <h2>Pauta de la prueba</h2>
+      <span class="hint">clave, eje y habilidad por ítem</span></div>
+    <div class="step-body">
+      <div class="grid2" style="margin-bottom:14px">
+        <div>
+          <label class="field" for="nitems">¿Cuántas preguntas?</label>
+          <input type="text" id="nitems" value="36" inputmode="numeric">
+        </div>
+        <div style="align-self:end">
+          <button class="btn secondary" id="genPauta">Generar tabla</button>
+        </div>
+      </div>
+      <div id="pautaWrap"></div>
+    </div>
+  </section>
+
+  <!-- PASO 3 -->
+  <section class="step">
+    <div class="step-head"><span class="step-num">3</span>
+      <h2>Fotos de las hojas</h2>
+      <span class="hint">una o varias</span></div>
+    <div class="step-body">
+      <label class="field" for="fotos">Sube las fotos o escaneos</label>
+      <input type="file" id="fotos" accept="image/*" multiple>
+      <p class="help">Asegúrate de que se vean las 4 marcas negras de las esquinas.</p>
+    </div>
+  </section>
+
+  <div class="actions">
+    <button class="btn" id="procesar">Procesar y generar Excel</button>
+    <span id="status"></span>
+  </div>
+
+  <div id="resultados"></div>
+  <div id="msg"></div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+
+// Generar tabla de pauta
+$("#genPauta").addEventListener("click", () => {
+  const n = parseInt($("#nitems").value) || 0;
+  if(n < 1 || n > 100){ alert("Ingresa un número entre 1 y 100"); return; }
+  let html = '<table class="pauta"><thead><tr>'
+    + '<th>N°</th><th>Clave</th><th>Eje</th><th>Habilidad</th><th>Especificación</th>'
+    + '</tr></thead><tbody>';
+  for(let i=1;i<=n;i++){
+    html += `<tr><td class="num">${i}</td>`
+      + `<td><input data-k="clave" data-i="${i}" maxlength="1" placeholder="A"></td>`
+      + `<td><input data-k="eje" data-i="${i}"></td>`
+      + `<td><input data-k="habilidad" data-i="${i}"></td>`
+      + `<td><input data-k="especificacion" data-i="${i}"></td></tr>`;
+  }
+  html += '</tbody></table>';
+  $("#pautaWrap").innerHTML = html;
+});
+// generar al cargar
+$("#genPauta").click();
+
+function recogerPauta(){
+  const filas = {};
+  document.querySelectorAll("#pautaWrap input").forEach(inp=>{
+    const i = inp.dataset.i, k = inp.dataset.k;
+    if(!filas[i]) filas[i] = {};
+    filas[i][k] = inp.value.trim().toUpperCase && k==="clave"
+      ? inp.value.trim().toUpperCase() : inp.value.trim();
+  });
+  return Object.keys(filas).sort((a,b)=>a-b).map(i=>filas[i]);
+}
+
+$("#procesar").addEventListener("click", async () => {
+  const msg = $("#msg"); msg.innerHTML = "";
+  const fotos = $("#fotos").files;
+  if(!fotos.length){ msg.innerHTML = '<div class="note error">Falta subir al menos una foto (paso 3).</div>'; return; }
+
+  const estudiantes = $("#lista").value.split("\n").map(s=>s.trim()).filter(Boolean);
+  const pauta = recogerPauta();
+
+  const fd = new FormData();
+  fd.append("estudiantes", JSON.stringify(estudiantes));
+  fd.append("pauta", JSON.stringify(pauta));
+  for(const f of fotos) fd.append("fotos", f);
+
+  $("#procesar").disabled = true;
+  $("#status").innerHTML = '<span class="spin"></span> Procesando…';
+  try{
+    const resp = await fetch("/procesar", {method:"POST", body:fd});
+    const data = await resp.json();
+    if(!resp.ok){ throw new Error(data.error || "Error desconocido"); }
+    pintarResultados(data.resultados);
+    msg.innerHTML = '<div class="note info">Listo. <a href="/descargar">Descargar Excel con resultados</a></div>';
+  }catch(e){
+    msg.innerHTML = `<div class="note error">${e.message}</div>`;
+  }finally{
+    $("#procesar").disabled = false;
+    $("#status").innerHTML = "";
+  }
+});
+
+function pintarResultados(rows){
+  const cont = $("#resultados");
+  if(!rows || !rows.length){ cont.innerHTML=""; return; }
+  let html = "<h2 style='font-size:15px;margin:24px 0 10px'>Hojas procesadas</h2>";
+  for(const r of rows){
+    let cls="ok", txt="N° "+r.n;
+    if(!r.n){ cls="err"; txt="sin N°"; }
+    html += `<div class="res-row"><span class="pill ${cls}">${txt}</span>`
+      + `<span>${r.archivo}</span>`
+      + `<span style="margin-left:auto;color:var(--muted);font-size:12.5px">${r.estado}</span></div>`;
+  }
+  cont.innerHTML = html;
+}
+</script>
+</body>
+</html>
